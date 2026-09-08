@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import ProjectPanel from "./components/ProjectPanel";
 import {
   checkCodeServer,
+  confirmDialog,
   loadProjects,
   pickFolder,
   saveProjects,
@@ -63,20 +64,23 @@ function App() {
     }
   }
 
-  function selectProject(id: string) {
+  // `project` can be passed directly for a project that isn't in `projects`
+  // state yet (React hasn't re-rendered after setProjects); looking it up by
+  // id here would silently find nothing and skip launch() forever.
+  function selectProject(id: string, project?: Project) {
     setSelectedId(id);
-    const project = projects.find((p) => p.id === id);
-    if (project && !ports[id] && statuses[id] !== "starting") {
-      launch(project);
+    const target = project ?? projects.find((p) => p.id === id);
+    if (target && !ports[id] && statuses[id] !== "starting") {
+      launch(target);
     }
   }
 
   async function addProject() {
     const path = await pickFolder();
     if (!path) return;
-    if (projects.some((p) => p.path === path)) {
-      const existing = projects.find((p) => p.path === path)!;
-      selectProject(existing.id);
+    const existing = projects.find((p) => p.path === path);
+    if (existing) {
+      selectProject(existing.id, existing);
       return;
     }
     const project: Project = {
@@ -85,13 +89,17 @@ function App() {
       path,
     };
     setProjects((prev) => [...prev, project]);
-    selectProject(project.id);
+    selectProject(project.id, project);
   }
 
   async function removeProject(id: string) {
     const project = projects.find((p) => p.id === id);
     const label = project ? project.name : "this project";
-    if (!confirm(`Remove "${label}"? This stops its VS Code instance.`)) return;
+    const ok = await confirmDialog(
+      `This stops its VS Code instance.`,
+      `Remove "${label}"?`,
+    );
+    if (!ok) return;
 
     try {
       await stopProject(id);

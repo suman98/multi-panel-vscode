@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { confirm, open } from "@tauri-apps/plugin-dialog";
 import type { Project } from "./types";
 
 /** Resolves the code-server binary path, or throws with install instructions. */
@@ -32,4 +32,9 @@ export async function pickFolder(): Promise<string | null> {
     title: "Choose a project folder",
   });
   return typeof result === "string" ? result : null;
+}
+
+/** Native confirm dialog. */
+export function confirmDialog(message: string, title?: string): Promise<boolean> {
+  return confirm(message, { title, kind: "warning" });
 }
