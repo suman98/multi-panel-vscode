@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// One code-server child process backing a single project's embedded VS Code.
 struct RunningServer {
@@ -287,11 +287,42 @@ fn open_in_vscode(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// The UI's origin is `http://localhost:<port>`, and the frontend keeps
+/// preferences (theme, sidebar width) in localStorage — which is keyed by
+/// origin. A port that changed every launch would silently reset them, so
+/// walk a fixed range in order and only fall back to an arbitrary free port
+/// if every one of them is taken.
+///
+/// Probes "localhost" rather than 127.0.0.1 because that is what the server
+/// itself binds, and the two don't always resolve to the same address family
+/// — handing over a port that's free on IPv4 but taken on IPv6 would leave
+/// the server unable to start.
+fn pick_ui_port() -> Option<u16> {
+    let free = |port: u16| TcpListener::bind(("localhost", port)).is_ok();
+    (41420..41440).find(|port| free(*port)).or_else(|| {
+        let ephemeral = TcpListener::bind(("localhost", 0)).ok()?;
+        ephemeral.local_addr().ok().map(|addr| addr.port())
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+
+    // A bundled build normally serves the UI from the `tauri://localhost`
+    // custom scheme. WebKit won't run VS Code's webviews — the panels
+    // extensions like Claude Code render into — inside a page that came from
+    // a custom scheme, so they come up permanently blank. Serving our own UI
+    // over http://localhost instead makes a bundled build behave like `tauri
+    // dev` (which is served by Vite over http), and the webviews work.
+    let ui_port = if tauri::is_dev() { None } else { pick_ui_port() };
+    if let Some(port) = ui_port {
+        builder = builder.plugin(tauri_plugin_localhost::Builder::new(port).build());
+    }
+
+    builder
         .manage(ServerRegistry::default())
         .invoke_handler(tauri::generate_handler![
             check_code_server,
@@ -305,6 +336,27 @@ pub fn run() {
             vscode_bridge::toggle_vscode_sidebar,
             vscode_bridge::set_vscode_theme,
         ])
+        .setup(move |app| {
+            // The window is built here rather than in tauri.conf.json because
+            // its URL depends on whether we're serving over http (above).
+            let url = match ui_port {
+                Some(port) => WebviewUrl::External(
+                    format!("http://localhost:{port}")
+                        .parse()
+                        .expect("localhost url is valid"),
+                ),
+                // Dev (Vite's http dev server), or the unlikely case that no
+                // port was free — the app still runs, webviews included in
+                // dev; a bundled fallback loses only the webviews.
+                None => WebviewUrl::default(),
+            };
+            WebviewWindowBuilder::new(app, "main", url)
+                .title("Multi VS Code Panel")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(800.0, 500.0)
+                .build()?;
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {

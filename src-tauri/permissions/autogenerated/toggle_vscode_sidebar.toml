@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-toggle-vscode-sidebar"
+description = "Enables the toggle_vscode_sidebar command without any pre-configured scope."
+commands.allow = ["toggle_vscode_sidebar"]
+
+[[permission]]
+identifier = "deny-toggle-vscode-sidebar"
+description = "Denies the toggle_vscode_sidebar command without any pre-configured scope."
+commands.deny = ["toggle_vscode_sidebar"]

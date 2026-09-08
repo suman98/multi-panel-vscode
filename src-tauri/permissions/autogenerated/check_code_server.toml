@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-code-server"
+description = "Enables the check_code_server command without any pre-configured scope."
+commands.allow = ["check_code_server"]
+
+[[permission]]
+identifier = "deny-check-code-server"
+description = "Denies the check_code_server command without any pre-configured scope."
+commands.deny = ["check_code_server"]

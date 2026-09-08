@@ -42,6 +42,24 @@ writes a small command file; every running project's copy of the extension
 polls that file and reveals its *own* integrated terminal only when the
 command targets its own workspace folder, so only the visible project reacts.
 
+## Why the app serves itself over http
+
+A bundled Tauri app normally loads its own UI from the `tauri://localhost`
+custom scheme. WebKit won't run VS Code's *webviews* — the panels extensions
+like Claude Code render into — inside a page that came from a custom scheme,
+so those panels come up permanently blank while the rest of VS Code works.
+`tauri dev` didn't show this because Vite serves the UI over http.
+
+So a bundled build starts a small local server (`tauri-plugin-localhost`) and
+points the window at `http://localhost:41420` — the same fixed port each
+launch, since the frontend's localStorage preferences are keyed by origin.
+Because that counts as a *remote* origin to Tauri's ACL, the app's own
+commands are declared in `build.rs` and granted in `capabilities/default.json`
+for `http://localhost:*` only. The embedded code-server iframes live on
+`127.0.0.1`, which deliberately doesn't match — and Tauri injects its IPC
+bridge into the main frame only, so VS Code and anything running inside it
+can't reach the app's commands either way.
+
 ## Requirements
 
 - macOS

@@ -10,15 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Multi VS Code Panel",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 500
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
