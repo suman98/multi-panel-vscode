@@ -245,16 +245,45 @@ fn read_image_as_data_url(path: String) -> Result<String, String> {
     ))
 }
 
+/// Resolve the VS Code CLI binary path. Checks common install locations and PATH.
+fn resolve_vscode_bin() -> Result<PathBuf, String> {
+    let candidates = [
+        "/usr/local/bin/code",           // Common symlink location
+        "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code", // Direct app path
+        "/opt/homebrew/bin/code",        // Apple Silicon Homebrew
+    ];
+    
+    for c in candidates {
+        let p = PathBuf::from(c);
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+    
+    // Try to find it in PATH using `which`
+    if let Ok(output) = Command::new("which").arg("code").output() {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Ok(PathBuf::from(path));
+            }
+        }
+    }
+    
+    Err("VS Code CLI not found. Install it via VS Code: ⇧⌘P → 'Shell Command: Install code command in PATH'".into())
+}
+
 /// Opens the project in a new VS Code window using the `code` command.
 #[tauri::command]
 fn open_in_vscode(path: String) -> Result<(), String> {
-    Command::new("code")
+    let bin = resolve_vscode_bin()?;
+    Command::new(bin)
         .arg(&path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| format!("Failed to open VS Code: {e}. Make sure 'code' command is installed."))?;
+        .map_err(|e| format!("Failed to open VS Code: {e}"))?;
     Ok(())
 }
 
