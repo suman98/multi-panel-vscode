@@ -1,3 +1,5 @@
+mod terminal;
+
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -5,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
@@ -22,6 +25,14 @@ struct Project {
     id: String,
     name: String,
     path: String,
+    #[serde(default)]
+    favorite: bool,
+    /// hex accent colour chosen by the user, e.g. "#f38ec4"
+    #[serde(default)]
+    color: Option<String>,
+    /// custom icon as a `data:image/png;base64,…` URL
+    #[serde(default)]
+    icon: Option<String>,
 }
 
 fn find_free_port() -> Result<u16, String> {
@@ -85,6 +96,17 @@ fn wait_until_ready(child: &mut Child, port: u16, timeout: Duration) -> Result<(
     }
 }
 
+/// Shared data dir for every code-server instance — one level above the
+/// `extensions` dir every project's process is pointed at, and where the
+/// terminal helper's command file lives (see `terminal.rs`).
+pub fn code_server_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("code-server"))
+}
+
 #[tauri::command]
 fn start_project(
     app: tauri::AppHandle,
@@ -103,11 +125,7 @@ fn start_project(
     let bin = resolve_code_server_bin()?;
     let port = find_free_port()?;
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("code-server");
+    let data_dir = code_server_data_dir(&app)?;
     // Separate user-data-dir per project avoids workspaceStorage lock
     // conflicts between simultaneously running instances; extensions are
     // shared so they aren't reinstalled per project.
@@ -115,6 +133,10 @@ fn start_project(
     let extensions_dir = data_dir.join("extensions");
     std::fs::create_dir_all(&user_data_dir).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&extensions_dir).map_err(|e| e.to_string())?;
+
+    // A server reads its extensions once, at startup — write this before
+    // spawning so the process we're about to start actually picks it up.
+    terminal::ensure_helper_extension(&extensions_dir);
 
     let mut child = Command::new(bin)
         .arg("--auth")
@@ -189,6 +211,37 @@ fn save_projects(app: tauri::AppHandle, projects: Vec<Project>) -> Result<(), St
     std::fs::write(&file, data).map_err(|e| e.to_string())
 }
 
+const MAX_ICON_BYTES: u64 = 5 * 1024 * 1024;
+
+/// Read a local image file and return it as a `data:` URL, for use as a
+/// project icon. No resizing — project icons are small on disk in practice,
+/// so this stays a plain read + base64 encode rather than pulling in an
+/// image-decoding dependency.
+#[tauri::command]
+fn read_image_as_data_url(path: String) -> Result<String, String> {
+    let meta = std::fs::metadata(&path).map_err(|e| format!("Could not read image: {e}"))?;
+    if meta.len() > MAX_ICON_BYTES {
+        return Err("Image is too large (max 5 MB).".to_string());
+    }
+    let bytes = std::fs::read(&path).map_err(|e| format!("Could not read image: {e}"))?;
+    let mime = match std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        Some("bmp") => "image/bmp",
+        _ => "image/png",
+    };
+    Ok(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    ))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -201,6 +254,8 @@ pub fn run() {
             stop_project,
             load_projects,
             save_projects,
+            read_image_as_data_url,
+            terminal::reveal_terminal,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

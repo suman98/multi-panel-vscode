@@ -34,6 +34,27 @@ export async function pickFolder(): Promise<string | null> {
   return typeof result === "string" ? result : null;
 }
 
+/** Opens the native image picker, for a project icon. Returns null if cancelled. */
+export async function pickImage(): Promise<string | null> {
+  const result = await open({
+    directory: false,
+    multiple: false,
+    title: "Choose a project icon",
+    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] }],
+  });
+  return typeof result === "string" ? result : null;
+}
+
+/** Reads a local image file into a `data:` URL suitable for storing as a project icon. */
+export function readImageAsDataUrl(path: string): Promise<string> {
+  return invoke<string>("read_image_as_data_url", { path });
+}
+
+/** Asks the running project's embedded VS Code to reveal its integrated terminal. */
+export function revealTerminal(path: string): Promise<void> {
+  return invoke<void>("reveal_terminal", { path });
+}
+
 /** Native confirm dialog. */
 export function confirmDialog(message: string, title?: string): Promise<boolean> {
   return confirm(message, { title, kind: "warning" });
