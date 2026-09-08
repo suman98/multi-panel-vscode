@@ -11,10 +11,11 @@ import {
   readImageAsDataUrl,
   revealTerminal,
   saveProjects,
+  setVscodeTheme,
   startProject,
   stopProject,
 } from "./api";
-import type { Project, ProjectStatus } from "./types";
+import type { Project, ProjectStatus, Theme } from "./types";
 import "./App.css";
 
 const SIDEBAR_MIN = 200;
@@ -41,7 +42,7 @@ function favoritesBoundary(projects: Project[]): number {
 }
 
 function App() {
-  const [projects, setProjectsState] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ports, setPorts] = useState<Record<string, number>>({});
   const [statuses, setStatuses] = useState<Record<string, ProjectStatus>>({});
@@ -49,18 +50,10 @@ function App() {
   const [codeServerReady, setCodeServerReady] = useState(true);
   const [flash, setFlash] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => stored("mvp.sidebarWidth", 260));
+  const [showSidebar, setShowSidebar] = useState(() => stored("mvp.showSidebar", true));
+  const [theme, setTheme] = useState<Theme>(() => stored<Theme>("mvp.theme", "dark"));
   const [resizing, setResizing] = useState(false);
   const loaded = useRef(false);
-
-  // Persist projects and update state together, so every mutation (favorite,
-  // colour, icon, add, remove) goes through one place.
-  const setProjects = (next: Project[] | ((prev: Project[]) => Project[])) => {
-    setProjectsState((prev) => {
-      const value = typeof next === "function" ? (next as (p: Project[]) => Project[])(prev) : next;
-      if (loaded.current) saveProjects(value).catch((e) => console.error("failed to save projects", e));
-      return value;
-    });
-  };
 
   const showError = (msg: string) => {
     setFlash(msg);
@@ -70,10 +63,16 @@ function App() {
   // Load persisted projects + verify code-server is installed, once on mount.
   useEffect(() => {
     loadProjects()
-      .then((p) => setProjectsState(p))
-      .catch((e) => console.error("failed to load projects", e))
-      .finally(() => {
+      .then((p) => {
+        setProjects(p);
+        // Only arm autosave once a load has actually succeeded — otherwise a
+        // transient read failure would let the effect below write an empty
+        // list straight over the user's real projects.json.
         loaded.current = true;
+      })
+      .catch((e) => {
+        console.error("failed to load projects", e);
+        showError(`Could not load your projects, so changes won't be saved: ${e}`);
       });
 
     checkCodeServer()
@@ -81,7 +80,26 @@ function App() {
       .catch(() => setCodeServerReady(false));
   }, []);
 
+  // Persist whenever the project list changes (skip the initial load itself).
+  // Deliberately an effect, not a side effect inside the state updater: React
+  // double-invokes updaters in StrictMode, so anything impure there runs twice.
+  useEffect(() => {
+    if (!loaded.current) return;
+    saveProjects(projects).catch((e) => console.error("failed to save projects", e));
+  }, [projects]);
+
   useEffect(() => remember("mvp.sidebarWidth", sidebarWidth), [sidebarWidth]);
+  useEffect(() => remember("mvp.showSidebar", showSidebar), [showSidebar]);
+
+  // Hangs off <html> so the whole document — including the ProjectMenu
+  // popover, which portals to <body> — swaps palette at once. Also pushed
+  // into every running (and future) embedded VS Code, so they match instead
+  // of staying on whatever theme they booted with.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    remember("mvp.theme", theme);
+    setVscodeTheme(theme).catch((e) => console.error("failed to sync VS Code theme", e));
+  }, [theme]);
 
   async function launch(project: Project) {
     setStatuses((s) => ({ ...s, [project.id]: "starting" }));
@@ -106,7 +124,11 @@ function App() {
   function selectProject(id: string, project?: Project) {
     setSelectedId(id);
     const target = project ?? projects.find((p) => p.id === id);
-    if (target && !ports[id] && statuses[id] !== "starting") {
+    if (!target) return;
+    // Bump recency on every select, not just a fresh launch, so the sidebar's
+    // "Nh ago" reflects when a project was last looked at.
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, last_opened: Date.now() } : p)));
+    if (!ports[id] && statuses[id] !== "starting") {
       launch(target);
     }
   }
@@ -177,12 +199,22 @@ function App() {
       const idx = prev.findIndex((p) => p.id === id);
       if (idx === -1) return prev;
       const next = [...prev];
-      const [proj] = next.splice(idx, 1);
-      proj.favorite = !proj.favorite;
+      const [old] = next.splice(idx, 1);
+      // A new object, never a mutation of the one still referenced by `prev`:
+      // StrictMode runs this updater twice, and flipping a shared object would
+      // toggle it straight back to where it started.
+      const proj = { ...old, favorite: !old.favorite };
       // Favourited → bottom of the favourites block; unfavourited → top of the
       // rest. Both land at the favourites/others boundary.
       next.splice(favoritesBoundary(next), 0, proj);
       return next;
+    });
+  }
+
+  function reorderProjects(order: string[]) {
+    setProjects((prev) => {
+      const rank = new Map(order.map((id, i) => [id, i]));
+      return [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
     });
   }
 
@@ -218,29 +250,34 @@ function App() {
 
   return (
     <div className="app">
-      <Sidebar
-        width={sidebarWidth}
-        projects={projects}
-        selectedId={selectedId}
-        statuses={statuses}
-        onSelect={selectProject}
-        onClose={closeProject}
-        onRemove={removeProject}
-        onAdd={addProject}
-        onToggleFavorite={toggleFavorite}
-        onColor={setColor}
-        onUploadIcon={uploadIcon}
-        onClearIcon={clearIcon}
-        codeServerReady={codeServerReady}
-      />
-      <Resizer
-        width={sidebarWidth}
-        min={SIDEBAR_MIN}
-        max={sidebarMax}
-        onResize={setSidebarWidth}
-        onDragStart={() => setResizing(true)}
-        onDragEnd={() => setResizing(false)}
-      />
+      {showSidebar && (
+        <>
+          <Sidebar
+            width={sidebarWidth}
+            projects={projects}
+            selectedId={selectedId}
+            statuses={statuses}
+            onSelect={selectProject}
+            onClose={closeProject}
+            onRemove={removeProject}
+            onReorder={reorderProjects}
+            onAdd={addProject}
+            onToggleFavorite={toggleFavorite}
+            onColor={setColor}
+            onUploadIcon={uploadIcon}
+            onClearIcon={clearIcon}
+            codeServerReady={codeServerReady}
+          />
+          <Resizer
+            width={sidebarWidth}
+            min={SIDEBAR_MIN}
+            max={sidebarMax}
+            onResize={setSidebarWidth}
+            onDragStart={() => setResizing(true)}
+            onDragEnd={() => setResizing(false)}
+          />
+        </>
+      )}
       {flash && <div className="notice error">{flash}</div>}
       <ProjectPanel
         projects={projects}
@@ -250,6 +287,11 @@ function App() {
         errors={errors}
         onRetry={retry}
         onShowTerminal={showTerminal}
+        showSidebar={showSidebar}
+        onToggleSidebar={() => setShowSidebar((v) => !v)}
+        onAdd={addProject}
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
       />
       {resizing && <div className="resize-shield" />}
     </div>

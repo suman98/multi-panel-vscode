@@ -1,4 +1,4 @@
-mod terminal;
+mod vscode_bridge;
 
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -33,6 +33,9 @@ struct Project {
     /// custom icon as a `data:image/png;base64,…` URL
     #[serde(default)]
     icon: Option<String>,
+    /// ms epoch of the last time this project was selected
+    #[serde(default)]
+    last_opened: Option<u64>,
 }
 
 fn find_free_port() -> Result<u16, String> {
@@ -136,7 +139,7 @@ fn start_project(
 
     // A server reads its extensions once, at startup — write this before
     // spawning so the process we're about to start actually picks it up.
-    terminal::ensure_helper_extension(&extensions_dir);
+    vscode_bridge::ensure_helper_extension(&extensions_dir);
 
     let mut child = Command::new(bin)
         .arg("--auth")
@@ -255,7 +258,8 @@ pub fn run() {
             load_projects,
             save_projects,
             read_image_as_data_url,
-            terminal::reveal_terminal,
+            vscode_bridge::reveal_terminal,
+            vscode_bridge::set_vscode_theme,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -55,6 +55,11 @@ export function revealTerminal(path: string): Promise<void> {
   return invoke<void>("reveal_terminal", { path });
 }
 
+/** Keeps every embedded VS Code's own colour theme in step with the app's. */
+export function setVscodeTheme(theme: "dark" | "light"): Promise<string> {
+  return invoke<string>("set_vscode_theme", { theme });
+}
+
 /** Native confirm dialog. */
 export function confirmDialog(message: string, title?: string): Promise<boolean> {
   return confirm(message, { title, kind: "warning" });

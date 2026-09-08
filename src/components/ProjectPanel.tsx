@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { Project, ProjectStatus } from "../types";
+import type { Project, ProjectStatus, Theme } from "../types";
 
 interface ProjectPanelProps {
   projects: Project[];
@@ -9,6 +9,11 @@ interface ProjectPanelProps {
   errors: Record<string, string>;
   onRetry: (id: string) => void;
   onShowTerminal: (path: string) => void;
+  showSidebar: boolean;
+  onToggleSidebar: () => void;
+  onAdd: () => void;
+  theme: Theme;
+  onToggleTheme: () => void;
 }
 
 export default function ProjectPanel({
@@ -19,29 +24,64 @@ export default function ProjectPanel({
   errors,
   onRetry,
   onShowTerminal,
+  showSidebar,
+  onToggleSidebar,
+  onAdd,
+  theme,
+  onToggleTheme,
 }: ProjectPanelProps) {
   const selected = projects.find((p) => p.id === selectedId) ?? null;
   const selectedRunning = !!selected && !!ports[selected.id];
 
   return (
     <main className="panel">
-      {selected && (
-        <header
-          className={"panel-head" + (selected.color ? " tinted" : "")}
-          style={selected.color ? ({ "--proj-color": selected.color } as CSSProperties) : undefined}
+      <header
+        className={"panel-head" + (selected?.color ? " tinted" : "")}
+        style={selected?.color ? ({ "--proj-color": selected.color } as CSSProperties) : undefined}
+      >
+        <button
+          className={"icon-btn" + (showSidebar ? " on" : "")}
+          onClick={onToggleSidebar}
+          title={showSidebar ? "Collapse sidebar" : "Show sidebar"}
+          aria-pressed={showSidebar}
         >
-          <span className="panel-head-name">{selected.name}</span>
-          <span className="panel-head-path">{selected.path}</span>
-          <button
-            className="terminal-btn"
-            onClick={() => onShowTerminal(selected.path)}
-            disabled={!selectedRunning}
-            title="Open the integrated terminal"
-          >
-            Terminal
+          ☰
+        </button>
+        {/* The sidebar's own + button disappears when it's collapsed, so give
+            it a way back here instead of stranding the user. */}
+        {!showSidebar && (
+          <button className="icon-btn" onClick={onAdd} title="Add project folder">
+            +
           </button>
-        </header>
-      )}
+        )}
+
+        {selected && (
+          <>
+            <span className="panel-head-name">{selected.name}</span>
+            <span className="panel-head-path">{selected.path}</span>
+          </>
+        )}
+
+        <div className="panel-head-actions">
+          {selected && (
+            <button
+              className="terminal-btn"
+              onClick={() => onShowTerminal(selected.path)}
+              disabled={!selectedRunning}
+              title="Open the integrated terminal"
+            >
+              Terminal
+            </button>
+          )}
+          <button
+            className="icon-btn"
+            onClick={onToggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? "☀" : "🌙"}
+          </button>
+        </div>
+      </header>
 
       <div className="panel-body">
         {/* Every project that has ever been started keeps its iframe mounted
