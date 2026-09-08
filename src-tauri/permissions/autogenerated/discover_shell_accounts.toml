@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-discover-shell-accounts"
+description = "Enables the discover_shell_accounts command without any pre-configured scope."
+commands.allow = ["discover_shell_accounts"]
+
+[[permission]]
+identifier = "deny-discover-shell-accounts"
+description = "Denies the discover_shell_accounts command without any pre-configured scope."
+commands.deny = ["discover_shell_accounts"]

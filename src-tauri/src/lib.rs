@@ -1,3 +1,4 @@
+mod accounts;
 mod vscode_bridge;
 
 use std::collections::HashMap;
@@ -36,6 +37,10 @@ struct Project {
     /// ms epoch of the last time this project was selected
     #[serde(default)]
     last_opened: Option<u64>,
+    /// which registered Claude account this project's VS Code runs as;
+    /// `None` means Claude Code's own keychain login
+    #[serde(default)]
+    account_id: Option<String>,
 }
 
 fn find_free_port() -> Result<u16, String> {
@@ -116,6 +121,7 @@ fn start_project(
     registry: tauri::State<ServerRegistry>,
     id: String,
     path: String,
+    account_id: Option<String>,
 ) -> Result<u16, String> {
     // Already running for this project: hand back its existing port instead
     // of spawning a second instance. Lock is held only for this check (and
@@ -141,7 +147,8 @@ fn start_project(
     // spawning so the process we're about to start actually picks it up.
     vscode_bridge::ensure_helper_extension(&extensions_dir);
 
-    let mut child = Command::new(bin)
+    let mut command = Command::new(bin);
+    command
         .arg("--auth")
         .arg("none")
         .arg("--bind-addr")
@@ -156,7 +163,18 @@ fn start_project(
         .arg(&path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::null());
+
+    // Claude Code inside this server reads its identity from the environment,
+    // and an unset variable means "use the keychain login" — so a project on
+    // the default account must actively clear anything we inherited rather
+    // than just not setting it.
+    match account_id.as_deref().and_then(accounts::read_token) {
+        Some(token) => command.env("CLAUDE_CODE_OAUTH_TOKEN", token),
+        None => command.env_remove("CLAUDE_CODE_OAUTH_TOKEN"),
+    };
+
+    let mut child = command
         .spawn()
         .map_err(|e| format!("failed to start code-server: {e}"))?;
 
@@ -305,6 +323,95 @@ fn pick_ui_port() -> Option<u16> {
     })
 }
 
+// ── Claude accounts ─────────────────────────────────────────────────────────
+//
+// The list itself is public (labels + masked hints); the tokens behind it stay
+// in the keychain and are only ever read at spawn time, in `start_project`.
+
+fn accounts_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path().app_data_dir().map_err(|e| e.to_string())
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+#[tauri::command]
+fn list_accounts(app: tauri::AppHandle) -> Result<Vec<accounts::Account>, String> {
+    Ok(accounts::load(&accounts_dir(&app)?))
+}
+
+#[tauri::command]
+fn add_account(
+    app: tauri::AppHandle,
+    label: String,
+    token: String,
+) -> Result<Vec<accounts::Account>, String> {
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err("Paste a token first.".into());
+    }
+    let dir = accounts_dir(&app)?;
+    let mut list = accounts::load(&dir);
+    let id = format!("acct-{}", now_ms());
+    let hint = accounts::store_token(&id, &token)?;
+    let label = if label.trim().is_empty() {
+        format!("Account {}", list.len() + 1)
+    } else {
+        label.trim().to_string()
+    };
+    list.push(accounts::Account { id, label, hint });
+    accounts::save(&dir, &list)?;
+    Ok(list)
+}
+
+/// Forgets the token as well as the entry. Projects pointing at it fall back to
+/// the keychain login the next time they start.
+#[tauri::command]
+fn remove_account(app: tauri::AppHandle, id: String) -> Result<Vec<accounts::Account>, String> {
+    accounts::forget_token(&id);
+    let dir = accounts_dir(&app)?;
+    let list: Vec<accounts::Account> = accounts::load(&dir)
+        .into_iter()
+        .filter(|a| a.id != id)
+        .collect();
+    accounts::save(&dir, &list)?;
+    Ok(list)
+}
+
+/// Tokens already exported in the user's shell profile, so they can be adopted
+/// with one click instead of pasted. Labels only — values stay in the backend.
+#[tauri::command]
+fn discover_shell_accounts(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let known: Vec<String> = accounts::load(&accounts_dir(&app)?)
+        .into_iter()
+        .map(|a| a.hint)
+        .collect();
+    Ok(accounts::scan_shell_profiles()
+        .into_iter()
+        .filter(|(_, token)| !known.contains(&accounts::hint_for(token)))
+        .map(|(label, _)| label)
+        .collect())
+}
+
+/// Registers a shell-profile token by its label. The token is copied straight
+/// into the keychain; it is never handed to the frontend.
+#[tauri::command]
+fn adopt_shell_account(
+    app: tauri::AppHandle,
+    label: String,
+    name: String,
+) -> Result<Vec<accounts::Account>, String> {
+    let (_, token) = accounts::scan_shell_profiles()
+        .into_iter()
+        .find(|(l, _)| *l == label)
+        .ok_or("That shell token is no longer there")?;
+    add_account(app, name, token)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -335,6 +442,11 @@ pub fn run() {
             vscode_bridge::reveal_terminal,
             vscode_bridge::toggle_vscode_sidebar,
             vscode_bridge::set_vscode_theme,
+            list_accounts,
+            add_account,
+            remove_account,
+            discover_shell_accounts,
+            adopt_shell_account,
         ])
         .setup(move |app| {
             // The window is built here rather than in tauri.conf.json because

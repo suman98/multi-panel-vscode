@@ -15,6 +15,11 @@ fn main() {
             "reveal_terminal",
             "toggle_vscode_sidebar",
             "set_vscode_theme",
+            "list_accounts",
+            "add_account",
+            "remove_account",
+            "discover_shell_accounts",
+            "adopt_shell_account",
         ])),
     )
     .expect("failed to run tauri build script")

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-adopt-shell-account"
+description = "Enables the adopt_shell_account command without any pre-configured scope."
+commands.allow = ["adopt_shell_account"]
+
+[[permission]]
+identifier = "deny-adopt-shell-account"
+description = "Denies the adopt_shell_account command without any pre-configured scope."
+commands.deny = ["adopt_shell_account"]

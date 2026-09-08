@@ -19,7 +19,12 @@
     "allow-open-in-vscode",
     "allow-reveal-terminal",
     "allow-toggle-vscode-sidebar",
-    "allow-set-vscode-theme"
+    "allow-set-vscode-theme",
+    "allow-list-accounts",
+    "allow-add-account",
+    "allow-remove-account",
+    "allow-discover-shell-accounts",
+    "allow-adopt-shell-account"
   ],
   "remote": {
     "urls": [

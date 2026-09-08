@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
+import { AccountsDialog } from "./components/AccountsDialog";
 import ProjectPanel from "./components/ProjectPanel";
 import { Resizer } from "./components/Resizer";
 import {
   checkCodeServer,
   confirmDialog,
+  listAccounts,
   loadProjects,
   openInVscode,
   pickFolder,
@@ -17,7 +19,7 @@ import {
   stopProject,
   toggleVscodeSidebar,
 } from "./api";
-import type { Project, ProjectStatus, Theme } from "./types";
+import type { Account, Project, ProjectStatus, Theme } from "./types";
 import "./App.css";
 
 const SIDEBAR_MIN = 200;
@@ -60,6 +62,8 @@ function App() {
   // match a fresh code-server's default (Explorer open).
   const [vscodeSidebarOpen, setVscodeSidebarOpen] = useState<Record<string, boolean>>({});
   const [resizing, setResizing] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [showAccounts, setShowAccounts] = useState(false);
   const loaded = useRef(false);
 
   const showError = (msg: string) => {
@@ -85,6 +89,10 @@ function App() {
     checkCodeServer()
       .then(() => setCodeServerReady(true))
       .catch(() => setCodeServerReady(false));
+
+    listAccounts()
+      .then(setAccounts)
+      .catch((e) => console.error("failed to load accounts", e));
   }, []);
 
   // Persist whenever the project list changes (skip the initial load itself).
@@ -116,7 +124,7 @@ function App() {
       return next;
     });
     try {
-      const port = await startProject(project.id, project.path);
+      const port = await startProject(project.id, project.path, project.account_id);
       setPorts((p) => ({ ...p, [project.id]: port }));
       setStatuses((s) => ({ ...s, [project.id]: "running" }));
     } catch (err) {
@@ -158,6 +166,30 @@ function App() {
     };
     setProjects((prev) => [...prev, project]);
     selectProject(project.id, project);
+  }
+
+  /** Assign a project to an account. The token is read when code-server is
+      spawned, so a project that's already running has to be restarted for the
+      switch to mean anything. */
+  async function setProjectAccount(id: string, accountId: string | null) {
+    const project = projects.find((p) => p.id === id);
+    if (!project || (project.account_id ?? null) === accountId) return;
+
+    const updated = { ...project, account_id: accountId };
+    setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+
+    if (!ports[id]) return;
+    try {
+      await stopProject(id);
+      setPorts((p) => {
+        const next = { ...p };
+        delete next[id];
+        return next;
+      });
+      await launch(updated);
+    } catch (e) {
+      showError(`Could not restart ${project.name} on the new account: ${e}`);
+    }
   }
 
   async function removeProject(id: string) {
@@ -289,6 +321,9 @@ function App() {
             onUploadIcon={uploadIcon}
             onClearIcon={clearIcon}
             onOpenInVscode={handleOpenInVscode}
+            accounts={accounts}
+            onAccount={setProjectAccount}
+            onManageAccounts={() => setShowAccounts(true)}
             codeServerReady={codeServerReady}
           />
           <Resizer
@@ -317,8 +352,18 @@ function App() {
         onAdd={addProject}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        accounts={accounts}
+        onAccount={setProjectAccount}
+        onManageAccounts={() => setShowAccounts(true)}
       />
       {resizing && <div className="resize-shield" />}
+      {showAccounts && (
+        <AccountsDialog
+          accounts={accounts}
+          onChange={setAccounts}
+          onClose={() => setShowAccounts(false)}
+        />
+      )}
     </div>
   );
 }

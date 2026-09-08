@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm, open } from "@tauri-apps/plugin-dialog";
-import type { Project } from "./types";
+import type { Account, Project } from "./types";
 
 /** Resolves the code-server binary path, or throws with install instructions. */
 export function checkCodeServer(): Promise<string> {
@@ -15,9 +15,15 @@ export function saveProjects(projects: Project[]): Promise<void> {
   return invoke<void>("save_projects", { projects });
 }
 
-/** Starts (or reuses) the code-server instance for a project, returning its port. */
-export function startProject(id: string, path: string): Promise<number> {
-  return invoke<number>("start_project", { id, path });
+/** Starts (or reuses) the code-server instance for a project, returning its
+    port. The account is read at spawn time, so switching one takes effect only
+    after a restart. */
+export function startProject(
+  id: string,
+  path: string,
+  accountId?: string | null,
+): Promise<number> {
+  return invoke<number>("start_project", { id, path, accountId: accountId ?? null });
 }
 
 export function stopProject(id: string): Promise<void> {
@@ -73,4 +79,29 @@ export function confirmDialog(message: string, title?: string): Promise<boolean>
 /** Opens the project in a new VS Code window using the `code` shell command. */
 export function openInVscode(path: string): Promise<void> {
   return invoke<void>("open_in_vscode", { path });
+}
+
+/** Registered Claude accounts (labels and masked hints only). */
+export function listAccounts(): Promise<Account[]> {
+  return invoke<Account[]>("list_accounts");
+}
+
+/** Stores a token in the login keychain and registers it. Returns the new list. */
+export function addAccount(label: string, token: string): Promise<Account[]> {
+  return invoke<Account[]>("add_account", { label, token });
+}
+
+/** Forgets an account and its keychain token. */
+export function removeAccount(id: string): Promise<Account[]> {
+  return invoke<Account[]>("remove_account", { id });
+}
+
+/** Labels of `CLAUDE_CODE_OAUTH_TOKEN` values found in the user's shell profiles. */
+export function discoverShellAccounts(): Promise<string[]> {
+  return invoke<string[]>("discover_shell_accounts");
+}
+
+/** Registers one of the discovered shell tokens under a name of your choosing. */
+export function adoptShellAccount(label: string, name: string): Promise<Account[]> {
+  return invoke<Account[]>("adopt_shell_account", { label, name });
 }

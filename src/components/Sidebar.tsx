@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Project, ProjectStatus } from "../types";
+import type { Account, Project, ProjectStatus } from "../types";
 import { parentPath, relativeTime } from "../format";
 import { ProjectMenu } from "./ProjectMenu";
 
@@ -19,6 +19,9 @@ interface SidebarProps {
   onUploadIcon: (id: string) => void;
   onClearIcon: (id: string) => void;
   onOpenInVscode: (id: string) => void;
+  accounts: Account[];
+  onAccount: (id: string, accountId: string | null) => void;
+  onManageAccounts: () => void;
   codeServerReady: boolean;
 }
 
@@ -116,6 +119,9 @@ export default function Sidebar({
   onUploadIcon,
   onClearIcon,
   onOpenInVscode,
+  accounts,
+  onAccount,
+  onManageAccounts,
   codeServerReady,
 }: SidebarProps) {
   const [query, setQuery] = useState("");
@@ -502,6 +508,15 @@ export default function Sidebar({
           onOpenInVscode={() => {
             setMenu(null);
             onOpenInVscode(menuProject.id);
+          }}
+          accounts={accounts}
+          onAccount={(accountId) => {
+            setMenu(null);
+            onAccount(menuProject.id, accountId);
+          }}
+          onManageAccounts={() => {
+            setMenu(null);
+            onManageAccounts();
           }}
         />
       )}

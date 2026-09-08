@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Project } from "../types";
+import type { Account, Project } from "../types";
 
 export const PROJECT_COLORS = [
   "#0e639c",
@@ -23,6 +23,10 @@ interface Props {
   onClearIcon: () => void;
   onRemove: () => void;
   onOpenInVscode: () => void;
+  accounts: Account[];
+  /** `null` = Claude Code's own keychain login */
+  onAccount: (accountId: string | null) => void;
+  onManageAccounts: () => void;
 }
 
 export function ProjectMenu({
@@ -35,6 +39,9 @@ export function ProjectMenu({
   onClearIcon,
   onRemove,
   onOpenInVscode,
+  accounts,
+  onAccount,
+  onManageAccounts,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
@@ -111,6 +118,30 @@ export function ProjectMenu({
           Remove icon
         </button>
       )}
+
+      <div className="pm-sep" />
+      <div className="pm-section-label">Claude account</div>
+      <button
+        className={"pm-item pm-check" + (!project.account_id ? " on" : "")}
+        onClick={() => onAccount(null)}
+      >
+        <span className="pm-tick">{!project.account_id ? "✓" : ""}</span>
+        Default (logged-in account)
+      </button>
+      {accounts.map((a) => (
+        <button
+          key={a.id}
+          className={"pm-item pm-check" + (project.account_id === a.id ? " on" : "")}
+          onClick={() => onAccount(a.id)}
+          title={a.hint}
+        >
+          <span className="pm-tick">{project.account_id === a.id ? "✓" : ""}</span>
+          {a.label}
+        </button>
+      ))}
+      <button className="pm-item" onClick={onManageAccounts}>
+        Manage accounts…
+      </button>
 
       <div className="pm-sep" />
       <button className="pm-item danger" onClick={onRemove}>

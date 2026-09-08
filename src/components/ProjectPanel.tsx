@@ -1,5 +1,97 @@
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Project, ProjectStatus, Theme } from "../types";
+import type { Account, Project, ProjectStatus, Theme } from "../types";
+
+/** Which Claude account the open project's VS Code is running as. The token is
+    read when code-server starts, so picking a different one restarts it. */
+function AccountSwitcher({
+  project,
+  accounts,
+  onAccount,
+  onManage,
+}: {
+  project: Project;
+  accounts: Account[];
+  onAccount: (accountId: string | null) => void;
+  onManage: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement | null>(null);
+  const current = accounts.find((a) => a.id === project.account_id) ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("mousedown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("mousedown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+
+  const pick = (accountId: string | null) => {
+    setOpen(false);
+    onAccount(accountId);
+  };
+
+  return (
+    <div className="acct-switch-wrap" ref={wrap}>
+      <button
+        className={"acct-switch" + (current ? " assigned" : "")}
+        onClick={() => setOpen((v) => !v)}
+        title={
+          current
+            ? `Claude account: ${current.label} (${current.hint})`
+            : "Claude account: whoever Claude Code is logged in as"
+        }
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span className="acct-switch-dot" />
+        <span className="acct-switch-label">{current ? current.label : "Default"}</span>
+        <span className="acct-switch-caret">▾</span>
+      </button>
+
+      {open && (
+        <div className="acct-switch-menu" role="menu">
+          <div className="pm-section-label">Claude account</div>
+          <button
+            className={"pm-item pm-check" + (!project.account_id ? " on" : "")}
+            onClick={() => pick(null)}
+          >
+            <span className="pm-tick">{!project.account_id ? "✓" : ""}</span>
+            Default (logged-in account)
+          </button>
+          {accounts.map((a) => (
+            <button
+              key={a.id}
+              className={"pm-item pm-check" + (project.account_id === a.id ? " on" : "")}
+              onClick={() => pick(a.id)}
+              title={a.hint}
+            >
+              <span className="pm-tick">{project.account_id === a.id ? "✓" : ""}</span>
+              {a.label}
+            </button>
+          ))}
+          <div className="pm-sep" />
+          <button
+            className="pm-item"
+            onClick={() => {
+              setOpen(false);
+              onManage();
+            }}
+          >
+            Manage accounts…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** VS Code's own Explorer sidebar — distinct from the app's own ☰ (its
     project list), a narrower left strip mirroring VS Code's own glyph. */
@@ -30,6 +122,9 @@ interface ProjectPanelProps {
   onAdd: () => void;
   theme: Theme;
   onToggleTheme: () => void;
+  accounts: Account[];
+  onAccount: (id: string, accountId: string | null) => void;
+  onManageAccounts: () => void;
 }
 
 export default function ProjectPanel({
@@ -47,6 +142,9 @@ export default function ProjectPanel({
   onAdd,
   theme,
   onToggleTheme,
+  accounts,
+  onAccount,
+  onManageAccounts,
 }: ProjectPanelProps) {
   const selected = projects.find((p) => p.id === selectedId) ?? null;
   const selectedRunning = !!selected && !!ports[selected.id];
@@ -82,6 +180,14 @@ export default function ProjectPanel({
         )}
 
         <div className="panel-head-actions">
+          {selected && (
+            <AccountSwitcher
+              project={selected}
+              accounts={accounts}
+              onAccount={(accountId) => onAccount(selected.id, accountId)}
+              onManage={onManageAccounts}
+            />
+          )}
           {selected && (
             <button
               className={"icon-btn" + (selectedSidebarOpen ? " on" : "")}

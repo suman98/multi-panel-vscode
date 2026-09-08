@@ -42,6 +42,26 @@ writes a small command file; every running project's copy of the extension
 polls that file and reveals its *own* integrated terminal only when the
 command targets its own workspace folder, so only the visible project reacts.
 
+## Claude accounts
+
+Claude Code takes its identity from `CLAUDE_CODE_OAUTH_TOKEN` when that's set,
+and otherwise from its own keychain login. Since every project here runs its
+own `code-server` process, each one can be spawned with a different token —
+two panels side by side, signed in as two different accounts.
+
+Register accounts from any project's **⋯ → Manage accounts…** (tokens already
+exported in your shell profile are offered for one-click adoption), then pick
+one per project in the same menu. A project left on **Default** uses whatever
+Claude Code is already logged in as — and its server is started with the
+variable explicitly *cleared*, so it can't inherit a token from the app's own
+environment.
+
+Tokens are written to the login keychain under the `multi-vscode-panel-oauth`
+service; `accounts.json` stores only a label and a masked hint, and the token
+itself is never sent to the frontend — it's read at spawn time and handed
+straight to the child process. The token is read only when a server starts, so
+changing a running project's account restarts that project's VS Code.
+
 ## Why the app serves itself over http
 
 A bundled Tauri app normally loads its own UI from the `tauri://localhost`
