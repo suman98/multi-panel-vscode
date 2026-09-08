@@ -259,6 +259,7 @@ pub fn run() {
             save_projects,
             read_image_as_data_url,
             vscode_bridge::reveal_terminal,
+            vscode_bridge::toggle_vscode_sidebar,
             vscode_bridge::set_vscode_theme,
         ])
         .build(tauri::generate_context!())

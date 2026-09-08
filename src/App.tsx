@@ -14,6 +14,7 @@ import {
   setVscodeTheme,
   startProject,
   stopProject,
+  toggleVscodeSidebar,
 } from "./api";
 import type { Project, ProjectStatus, Theme } from "./types";
 import "./App.css";
@@ -52,6 +53,11 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(() => stored("mvp.sidebarWidth", 260));
   const [showSidebar, setShowSidebar] = useState(() => stored("mvp.showSidebar", true));
   const [theme, setTheme] = useState<Theme>(() => stored<Theme>("mvp.theme", "dark"));
+  // Local best-effort tracking only — VS Code owns this state, not us, and
+  // has no way to report it back, so this can drift if a project's sidebar
+  // is toggled from inside VS Code itself (e.g. its own ⌘B). Starts true to
+  // match a fresh code-server's default (Explorer open).
+  const [vscodeSidebarOpen, setVscodeSidebarOpen] = useState<Record<string, boolean>>({});
   const [resizing, setResizing] = useState(false);
   const loaded = useRef(false);
 
@@ -241,6 +247,11 @@ function App() {
     revealTerminal(path).catch((e) => showError(String(e)));
   }
 
+  function toggleSidebarFor(id: string, path: string) {
+    setVscodeSidebarOpen((s) => ({ ...s, [id]: !(s[id] ?? true) }));
+    toggleVscodeSidebar(path).catch((e) => showError(String(e)));
+  }
+
   function retry(id: string) {
     const project = projects.find((p) => p.id === id);
     if (project) launch(project);
@@ -287,6 +298,8 @@ function App() {
         errors={errors}
         onRetry={retry}
         onShowTerminal={showTerminal}
+        vscodeSidebarOpen={vscodeSidebarOpen}
+        onToggleVscodeSidebar={toggleSidebarFor}
         showSidebar={showSidebar}
         onToggleSidebar={() => setShowSidebar((v) => !v)}
         onAdd={addProject}

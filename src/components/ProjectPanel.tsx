@@ -1,6 +1,18 @@
 import type { CSSProperties } from "react";
 import type { Project, ProjectStatus, Theme } from "../types";
 
+/** VS Code's own Explorer sidebar — distinct from the app's own ☰ (its
+    project list), a narrower left strip mirroring VS Code's own glyph. */
+function VscodeSidebarIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M5 2.8v10.4" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="2.4" y="3.4" width="2" height="9.2" rx="0.8" fill="currentColor" opacity="0.55" />
+    </svg>
+  );
+}
+
 interface ProjectPanelProps {
   projects: Project[];
   selectedId: string | null;
@@ -9,6 +21,10 @@ interface ProjectPanelProps {
   errors: Record<string, string>;
   onRetry: (id: string) => void;
   onShowTerminal: (path: string) => void;
+  /** best-effort — a locally-tracked guess, since VS Code doesn't report its
+      own sidebar's open state back to us */
+  vscodeSidebarOpen: Record<string, boolean>;
+  onToggleVscodeSidebar: (id: string, path: string) => void;
   showSidebar: boolean;
   onToggleSidebar: () => void;
   onAdd: () => void;
@@ -24,6 +40,8 @@ export default function ProjectPanel({
   errors,
   onRetry,
   onShowTerminal,
+  vscodeSidebarOpen,
+  onToggleVscodeSidebar,
   showSidebar,
   onToggleSidebar,
   onAdd,
@@ -32,6 +50,7 @@ export default function ProjectPanel({
 }: ProjectPanelProps) {
   const selected = projects.find((p) => p.id === selectedId) ?? null;
   const selectedRunning = !!selected && !!ports[selected.id];
+  const selectedSidebarOpen = selected ? (vscodeSidebarOpen[selected.id] ?? true) : true;
 
   return (
     <main className="panel">
@@ -63,6 +82,17 @@ export default function ProjectPanel({
         )}
 
         <div className="panel-head-actions">
+          {selected && (
+            <button
+              className={"icon-btn" + (selectedSidebarOpen ? " on" : "")}
+              onClick={() => onToggleVscodeSidebar(selected.id, selected.path)}
+              disabled={!selectedRunning}
+              title="Toggle VS Code's sidebar"
+              aria-pressed={selectedSidebarOpen}
+            >
+              <VscodeSidebarIcon />
+            </button>
+          )}
           {selected && (
             <button
               className="terminal-btn"

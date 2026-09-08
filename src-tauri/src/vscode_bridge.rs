@@ -4,11 +4,11 @@
 // each project as a separate process, but every process shares one
 // extensions dir (see lib.rs) and one command file.
 //
-// "revealTerminal" is targeted — the extension only acts if the command's
-// `path` matches its own workspace folder, so only the visible project's
-// terminal responds. "setTheme" is broadcast — every running project applies
-// it, so a project that's merely hidden (not the active one) still matches
-// the app's theme by the time it's switched to.
+// "revealTerminal" and "toggleSidebar" are targeted — the extension only acts
+// if the command's `path` matches its own workspace folder, so only the
+// visible project responds. "setTheme" is broadcast — every running project
+// applies it, so a project that's merely hidden (not the active one) still
+// matches the app's theme by the time it's switched to.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -19,8 +19,8 @@ use tauri::AppHandle;
 static MANIFEST_LOCK: Mutex<()> = Mutex::new(());
 
 const HELPER_ID: &str = "multivscodepanel.vscode-bridge";
-const HELPER_VERSION: &str = "1.1.0";
-const HELPER_FOLDER: &str = "multivscodepanel.vscode-bridge-1.1.0";
+const HELPER_VERSION: &str = "1.2.0";
+const HELPER_FOLDER: &str = "multivscodepanel.vscode-bridge-1.2.0";
 const COMMAND_FILE: &str = "mvp-cmd.json";
 /// Persisted separately from the command file so a project started long after
 /// the last theme toggle still comes up matching, instead of always booting
@@ -30,9 +30,9 @@ const THEME_FILE: &str = "mvp-theme.json";
 const PACKAGE_JSON: &str = r#"{
   "name": "vscode-bridge",
   "displayName": "Multi VS Code Panel Bridge",
-  "description": "Reveals the terminal and syncs the colour theme on command from the host app.",
+  "description": "Reveals the terminal, toggles the sidebar, and syncs the colour theme on command from the host app.",
   "publisher": "multivscodepanel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "engines": { "vscode": "^1.90.0" },
   "main": "./extension.js",
   "activationEvents": ["onStartupFinished"],
@@ -170,6 +170,10 @@ function watchCommands(context) {
         const term =
           vscode.window.activeTerminal || vscode.window.terminals[0] || vscode.window.createTerminal();
         term.show();
+      }
+    } else if (msg.command === "toggleSidebar") {
+      if (msg.path && msg.path === myWorkspacePath()) {
+        vscode.commands.executeCommand("workbench.action.toggleSidebarVisibility");
       }
     } else if (msg.command === "setTheme") {
       applyTheme(msg.theme === "light" ? "light" : "dark");
@@ -327,6 +331,19 @@ pub fn reveal_terminal(app: AppHandle, path: String) -> Result<(), String> {
     push_command(
         &data_dir,
         serde_json::json!({ "nonce": nonce(), "command": "revealTerminal", "path": path }),
+    )
+}
+
+/// Ask the running project's embedded VS Code to toggle its own Explorer /
+/// primary sidebar — only the instance whose workspace matches `path` acts.
+/// Distinct from the app's own project sidebar, which is plain local UI
+/// state and never goes through VS Code at all.
+#[tauri::command]
+pub fn toggle_vscode_sidebar(app: AppHandle, path: String) -> Result<(), String> {
+    let data_dir = crate::code_server_data_dir(&app)?;
+    push_command(
+        &data_dir,
+        serde_json::json!({ "nonce": nonce(), "command": "toggleSidebar", "path": path }),
     )
 }
 

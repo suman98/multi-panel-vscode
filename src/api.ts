@@ -55,6 +55,11 @@ export function revealTerminal(path: string): Promise<void> {
   return invoke<void>("reveal_terminal", { path });
 }
 
+/** Asks the running project's embedded VS Code to toggle its own Explorer/primary sidebar. */
+export function toggleVscodeSidebar(path: string): Promise<void> {
+  return invoke<void>("toggle_vscode_sidebar", { path });
+}
+
 /** Keeps every embedded VS Code's own colour theme in step with the app's. */
 export function setVscodeTheme(theme: "dark" | "light"): Promise<string> {
   return invoke<string>("set_vscode_theme", { theme });
