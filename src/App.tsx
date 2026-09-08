@@ -6,6 +6,7 @@ import {
   checkCodeServer,
   confirmDialog,
   loadProjects,
+  openInVscode,
   pickFolder,
   pickImage,
   readImageAsDataUrl,
@@ -257,6 +258,16 @@ function App() {
     if (project) launch(project);
   }
 
+  async function handleOpenInVscode(id: string) {
+    const project = projects.find((p) => p.id === id);
+    if (!project) return;
+    try {
+      await openInVscode(project.path);
+    } catch (e) {
+      showError(String(e));
+    }
+  }
+
   const sidebarMax = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, window.innerWidth - 380));
 
   return (
@@ -277,6 +288,7 @@ function App() {
             onColor={setColor}
             onUploadIcon={uploadIcon}
             onClearIcon={clearIcon}
+            onOpenInVscode={handleOpenInVscode}
             codeServerReady={codeServerReady}
           />
           <Resizer

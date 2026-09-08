@@ -22,6 +22,7 @@ interface Props {
   onUploadIcon: () => void;
   onClearIcon: () => void;
   onRemove: () => void;
+  onOpenInVscode: () => void;
 }
 
 export function ProjectMenu({
@@ -33,6 +34,7 @@ export function ProjectMenu({
   onUploadIcon,
   onClearIcon,
   onRemove,
+  onOpenInVscode,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
@@ -63,8 +65,14 @@ export function ProjectMenu({
     };
   }, [anchor, onClose]);
 
+  
+
   return createPortal(
     <div className="proj-menu" ref={ref} style={{ top: pos.top, left: pos.left }}>
+      <button className="pm-item" onClick={onOpenInVscode}>
+       Open in new Editor
+      </button>
+
       <button className="pm-item" onClick={onToggleFavorite}>
         <span className={"pm-star" + (project.favorite ? " on" : "")}>
           {project.favorite ? "★" : "☆"}

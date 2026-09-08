@@ -18,6 +18,7 @@ interface SidebarProps {
   onColor: (id: string, color: string | null) => void;
   onUploadIcon: (id: string) => void;
   onClearIcon: (id: string) => void;
+  onOpenInVscode: (id: string) => void;
   codeServerReady: boolean;
 }
 
@@ -114,6 +115,7 @@ export default function Sidebar({
   onColor,
   onUploadIcon,
   onClearIcon,
+  onOpenInVscode,
   codeServerReady,
 }: SidebarProps) {
   const [query, setQuery] = useState("");
@@ -496,6 +498,10 @@ export default function Sidebar({
           onRemove={() => {
             setMenu(null);
             onRemove(menuProject.id);
+          }}
+          onOpenInVscode={() => {
+            setMenu(null);
+            onOpenInVscode(menuProject.id);
           }}
         />
       )}

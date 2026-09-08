@@ -245,6 +245,19 @@ fn read_image_as_data_url(path: String) -> Result<String, String> {
     ))
 }
 
+/// Opens the project in a new VS Code window using the `code` command.
+#[tauri::command]
+fn open_in_vscode(path: String) -> Result<(), String> {
+    Command::new("code")
+        .arg(&path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to open VS Code: {e}. Make sure 'code' command is installed."))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -258,6 +271,7 @@ pub fn run() {
             load_projects,
             save_projects,
             read_image_as_data_url,
+            open_in_vscode,
             vscode_bridge::reveal_terminal,
             vscode_bridge::toggle_vscode_sidebar,
             vscode_bridge::set_vscode_theme,

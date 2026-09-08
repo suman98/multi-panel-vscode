@@ -69,3 +69,8 @@ export function setVscodeTheme(theme: "dark" | "light"): Promise<string> {
 export function confirmDialog(message: string, title?: string): Promise<boolean> {
   return confirm(message, { title, kind: "warning" });
 }
+
+/** Opens the project in a new VS Code window using the `code` shell command. */
+export function openInVscode(path: string): Promise<void> {
+  return invoke<void>("open_in_vscode", { path });
+}
