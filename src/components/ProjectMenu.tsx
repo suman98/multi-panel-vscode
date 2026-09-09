@@ -13,6 +13,22 @@ export const PROJECT_COLORS = [
   "#4bc8d6",
 ] as const;
 
+const DEFAULT_CUSTOM = "#7c9cff";
+
+/** `#abc` / `abcdef` / `#ABCDEF` → `#aabbcc`. Returns null for anything else. */
+function normalizeHex(value: string): string | null {
+  const s = value.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(s)) {
+    return "#" + s.toLowerCase().split("").map((c) => c + c).join("");
+  }
+  if (/^[0-9a-f]{6}$/i.test(s)) return "#" + s.toLowerCase();
+  return null;
+}
+
+function isPreset(color: string | null | undefined): boolean {
+  return !!color && (PROJECT_COLORS as readonly string[]).includes(color.toLowerCase());
+}
+
 interface Props {
   project: Project;
   anchor: HTMLElement;
@@ -45,6 +61,12 @@ export function ProjectMenu({
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
+  // A colour that isn't one of the presets can only have come from the custom
+  // picker, so reopen the menu with that section already expanded.
+  const custom = project.color && !isPreset(project.color) ? project.color : null;
+  const [customOpen, setCustomOpen] = useState(!!custom);
+  const [hexText, setHexText] = useState(custom ?? "");
+  const swatchValue = normalizeHex(hexText) ?? custom ?? DEFAULT_CUSTOM;
 
   useLayoutEffect(() => {
     const a = anchor.getBoundingClientRect();
@@ -107,7 +129,54 @@ export function ProjectMenu({
         >
           ⊘
         </button>
+        <button
+          className={"pm-swatch pm-custom" + (custom ? " on" : "")}
+          style={custom ? { background: custom } : undefined}
+          onClick={() => setCustomOpen((v) => !v)}
+          title="Custom colour…"
+          aria-label="Custom colour"
+          aria-expanded={customOpen}
+        >
+          {custom ? "" : "+"}
+        </button>
       </div>
+
+      {customOpen && (
+        <div className="pm-custom-row">
+          <input
+            type="color"
+            className="pm-color-input"
+            value={swatchValue}
+            onChange={(e) => {
+              setHexText(e.target.value);
+              onColor(e.target.value);
+            }}
+            aria-label="Pick a custom colour"
+          />
+          <input
+            className="pm-hex"
+            value={hexText}
+            placeholder="#rrggbb"
+            spellCheck={false}
+            autoComplete="off"
+            maxLength={7}
+            aria-label="Custom colour hex"
+            onChange={(e) => {
+              setHexText(e.target.value);
+              const hex = normalizeHex(e.target.value);
+              if (hex) onColor(hex);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              const hex = normalizeHex(hexText);
+              if (hex) {
+                setHexText(hex);
+                onColor(hex);
+              }
+            }}
+          />
+        </div>
+      )}
 
       <div className="pm-sep" />
       <button className="pm-item" onClick={onUploadIcon}>

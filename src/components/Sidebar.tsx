@@ -14,6 +14,9 @@ interface SidebarProps {
   onRemove: (id: string) => void;
   onReorder: (order: string[]) => void;
   onAdd: () => void;
+  onCloseAll: () => void;
+  /** how many projects currently have a VS Code instance up */
+  openCount: number;
   onToggleFavorite: (id: string) => void;
   onColor: (id: string, color: string | null) => void;
   onUploadIcon: (id: string) => void;
@@ -80,6 +83,27 @@ function GripIcon() {
   );
 }
 
+/** Stacked editor windows with an ✕ on the front one — "close every open one". */
+function CloseAllIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="13"
+      height="13"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6.1 2.3h5.6a2 2 0 0 1 2 2v5.6" opacity="0.6" />
+      <rect x="2.3" y="4.6" width="7.6" height="7.6" rx="1.7" />
+      <path d="M4.7 7l2.8 2.8M7.5 7L4.7 9.8" />
+    </svg>
+  );
+}
+
 const DRAG_THRESHOLD = 4;
 const EDGE_ZONE = 48; // px from list edge where auto-scroll kicks in
 const EDGE_SPEED = 16; // max px per frame
@@ -114,6 +138,8 @@ export default function Sidebar({
   onRemove,
   onReorder,
   onAdd,
+  onCloseAll,
+  openCount,
   onToggleFavorite,
   onColor,
   onUploadIcon,
@@ -355,9 +381,24 @@ export default function Sidebar({
     <aside className="sidebar" style={{ width }}>
       <div className="sidebar-header">
         <span className="sidebar-title">Projects</span>
-        <button className="add-btn" onClick={onAdd} title="Add project folder">
-          +
-        </button>
+        <div className="sidebar-actions">
+          <button
+            className="hdr-btn"
+            onClick={onCloseAll}
+            disabled={openCount === 0}
+            title={
+              openCount === 0
+                ? "No open projects"
+                : `Close all ${openCount} open project${openCount === 1 ? "" : "s"}`
+            }
+            aria-label="Close all open projects"
+          >
+            <CloseAllIcon />
+          </button>
+          <button className="add-btn" onClick={onAdd} title="Add project folder">
+            +
+          </button>
+        </div>
       </div>
 
       {!codeServerReady && (

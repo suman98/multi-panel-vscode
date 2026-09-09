@@ -66,6 +66,13 @@ function App() {
   const [showAccounts, setShowAccounts] = useState(false);
   const loaded = useRef(false);
 
+  // A project counts as open once it has a port, or while it's still coming
+  // up — "starting" instances have a spawned code-server worth stopping too.
+  const openIds = projects
+    .filter((p) => ports[p.id] !== undefined || statuses[p.id] === "starting")
+    .map((p) => p.id);
+  const openCount = openIds.length;
+
   const showError = (msg: string) => {
     setFlash(msg);
     window.setTimeout(() => setFlash((cur) => (cur === msg ? null : cur)), 4500);
@@ -218,6 +225,35 @@ function App() {
     setSelectedId((current) => (current === id ? null : current));
   }
 
+  /** Tear down every running VS Code at once, keeping the projects themselves. */
+  async function closeAllProjects() {
+    const ids = openIds;
+    if (ids.length === 0) return;
+    const ok = await confirmDialog(
+      `This stops ${ids.length} running VS Code instance${ids.length === 1 ? "" : "s"}. The projects stay in your list.`,
+      ids.length === 1 ? "Close the open project?" : `Close all ${ids.length} open projects?`,
+    );
+    if (!ok) return;
+
+    const settled = await Promise.allSettled(ids.map((id) => stopProject(id)));
+    // Only forget the ones that actually stopped — a failed stop leaves a
+    // server up, and marking it idle would hide that.
+    const stopped = ids.filter((_, i) => settled[i].status === "fulfilled");
+    setPorts((p) => {
+      const next = { ...p };
+      for (const id of stopped) delete next[id];
+      return next;
+    });
+    setStatuses((s) => {
+      const next = { ...s };
+      for (const id of stopped) next[id] = "idle";
+      return next;
+    });
+
+    const failed = ids.length - stopped.length;
+    if (failed > 0) showError(`Could not close ${failed} project${failed === 1 ? "" : "s"}.`);
+  }
+
   /** Tear down a project's VS Code without forgetting the project itself. */
   async function closeProject(id: string) {
     try {
@@ -316,6 +352,8 @@ function App() {
             onRemove={removeProject}
             onReorder={reorderProjects}
             onAdd={addProject}
+            onCloseAll={closeAllProjects}
+            openCount={openCount}
             onToggleFavorite={toggleFavorite}
             onColor={setColor}
             onUploadIcon={uploadIcon}
