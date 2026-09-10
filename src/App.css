@@ -234,6 +234,12 @@ body {
   padding: 2px 6px 8px;
   overflow-y: auto;
   flex: 1;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge */
+}
+
+.project-list::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/WebKit */
 }
 
 .group-label {
@@ -492,6 +498,48 @@ body.dnd-active .project-item:hover:not(.dragging) {
   background: var(--bg-elev);
   border: 1px solid var(--border-soft);
   box-shadow: 0 16px 40px -12px var(--shadow);
+  /* Paired with the inline max-height: when neither side of the anchor has
+     room for the whole menu, scroll it instead of letting it run off-screen. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.pm-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 2px 6px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pm-head-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.pm-flip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.pm-flip:hover {
+  background: var(--bg-active);
+  color: var(--text-strong);
 }
 
 .pm-section-label {
@@ -555,31 +603,82 @@ body.dnd-active .project-item:hover:not(.dragging) {
   );
 }
 
+.pm-custom-panel {
+  padding: 8px 2px 2px;
+}
+
+.pm-picker {
+  display: grid;
+  gap: 8px;
+  touch-action: none;
+}
+
+/* White→hue left to right, transparent→black top to bottom: the standard
+   saturation/value square. */
+.pm-sv {
+  position: relative;
+  height: 84px;
+  border-radius: 5px;
+  outline: 1px solid var(--swatch-ring);
+  outline-offset: -1px;
+  cursor: crosshair;
+  background:
+    linear-gradient(to top, #000, rgba(0, 0, 0, 0)),
+    linear-gradient(to right, #fff, var(--hue));
+}
+
+.pm-hue {
+  position: relative;
+  height: 11px;
+  border-radius: 6px;
+  outline: 1px solid var(--swatch-ring);
+  outline-offset: -1px;
+  cursor: ew-resize;
+  background: linear-gradient(
+    to right,
+    #f00 0%,
+    #ff0 16.66%,
+    #0f0 33.33%,
+    #0ff 50%,
+    #00f 66.66%,
+    #f0f 83.33%,
+    #f00 100%
+  );
+}
+
+.pm-sv-thumb,
+.pm-hue-thumb {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.pm-sv-thumb {
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+}
+
+.pm-hue-thumb {
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translate(-50%, -50%);
+}
+
 .pm-custom-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 2px 2px;
+  padding-top: 8px;
 }
 
-.pm-color-input {
+.pm-custom-preview {
   flex: none;
   width: 26px;
   height: 26px;
-  padding: 0;
-  border: none;
-  border-radius: 5px;
-  background: none;
-  cursor: pointer;
-}
-
-/* Strip the native chrome so the input reads as a plain swatch. */
-.pm-color-input::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.pm-color-input::-webkit-color-swatch {
-  border: none;
   border-radius: 5px;
   outline: 1px solid var(--swatch-ring);
   outline-offset: -1px;

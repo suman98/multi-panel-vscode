@@ -8,6 +8,7 @@ import {
   confirmDialog,
   listAccounts,
   loadProjects,
+  openExternal,
   openInVscode,
   pickFolder,
   pickImage,
@@ -122,6 +123,44 @@ function App() {
     remember("mvp.theme", theme);
     setVscodeTheme(theme).catch((e) => console.error("failed to sync VS Code theme", e));
   }, [theme]);
+
+  // WKWebView blocks `window.open` outright — no pop-up permission exists to
+  // grant — so a shim injected into every embedded VS Code posts the URL up
+  // here instead (see popup_bridge.rs). A link back to one of our own
+  // code-server ports means "open this project", so switch panels rather than
+  // launching a browser; everything else is a genuinely external link.
+  useEffect(() => {
+    function onPopup(event: MessageEvent) {
+      const data = event.data as { __mvp?: string; url?: unknown } | null;
+      if (!data || data.__mvp !== "open-external" || typeof data.url !== "string") return;
+
+      let target: URL;
+      try {
+        target = new URL(data.url);
+      } catch {
+        return;
+      }
+
+      const isOurs =
+        (target.hostname === "127.0.0.1" || target.hostname === "localhost") &&
+        Object.values(ports).some((port) => String(port) === target.port);
+      if (isOurs) {
+        const folder = target.searchParams.get("folder");
+        const project = folder ? projects.find((p) => p.path === folder) : undefined;
+        if (project) {
+          selectProject(project.id, project);
+          return;
+        }
+        // A folder we don't track: the browser at least gets a working VS
+        // Code, which is better than swallowing the click.
+      }
+
+      openExternal(data.url).catch((e) => showError(String(e)));
+    }
+
+    window.addEventListener("message", onPopup);
+    return () => window.removeEventListener("message", onPopup);
+  }, [ports, projects]);
 
   async function launch(project: Project) {
     setStatuses((s) => ({ ...s, [project.id]: "starting" }));

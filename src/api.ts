@@ -105,3 +105,8 @@ export function discoverShellAccounts(): Promise<string[]> {
 export function adoptShellAccount(label: string, name: string): Promise<Account[]> {
   return invoke<Account[]>("adopt_shell_account", { label, name });
 }
+
+/** Hands a URL to the system's default browser. */
+export function openExternal(url: string): Promise<void> {
+  return invoke<void>("open_external", { url });
+}

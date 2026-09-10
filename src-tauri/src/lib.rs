@@ -1,4 +1,5 @@
 mod accounts;
+mod popup_bridge;
 mod vscode_bridge;
 
 use std::collections::HashMap;
@@ -447,6 +448,7 @@ pub fn run() {
             remove_account,
             discover_shell_accounts,
             adopt_shell_account,
+            popup_bridge::open_external,
         ])
         .setup(move |app| {
             // The window is built here rather than in tauri.conf.json because
@@ -463,6 +465,10 @@ pub fn run() {
                 None => WebviewUrl::default(),
             };
             WebviewWindowBuilder::new(app, "main", url)
+                // Runs in the code-server iframes and their nested VS Code
+                // webviews too, not just our own page — that's where the
+                // blocked pop-ups come from.
+                .initialization_script_for_all_frames(popup_bridge::INIT_SCRIPT)
                 .title("Multi VS Code Panel")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(800.0, 500.0)

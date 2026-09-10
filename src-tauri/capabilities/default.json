@@ -24,7 +24,8 @@
     "allow-add-account",
     "allow-remove-account",
     "allow-discover-shell-accounts",
-    "allow-adopt-shell-account"
+    "allow-adopt-shell-account",
+    "allow-open-external"
   ],
   "remote": {
     "urls": [

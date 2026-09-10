@@ -20,6 +20,7 @@ fn main() {
             "remove_account",
             "discover_shell_accounts",
             "adopt_shell_account",
+            "open_external",
         ])),
     )
     .expect("failed to run tauri build script")
