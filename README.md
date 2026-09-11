@@ -101,6 +101,17 @@ npm run tauri dev
 npm run tauri build
 ```
 
+## Releases
+
+Local `npm run tauri build` only produces a macOS bundle. Windows and Linux
+builds run in CI: push a `v*` tag (or trigger **Release** manually from the
+Actions tab) and [.github/workflows/release.yml](.github/workflows/release.yml)
+builds installers on `windows-latest` and `ubuntu-22.04`, attaching them as a
+draft GitHub Release. Note that the app's project-discovery logic
+(`resolve_code_server_bin`/`resolve_code_bin` in `src-tauri/src/lib.rs`) is
+currently macOS-specific (Homebrew paths, `which`), so the Windows/Linux
+bundles build and launch but won't find `code-server` unless that's fixed too.
+
 ## Security note
 
 Each project's code-server is started with `--auth none` and bound to
