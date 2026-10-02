@@ -30,7 +30,36 @@ inside the app's right panel, not a separate OS window.
   conflicts between simultaneously open projects) but shares one
   `--extensions-dir`, so an extension installed in one project is available
   in all of them — including a small local extension the app installs itself
-  to power the Terminal button (see below).
+  to power the Terminal button (see below). Settings are shared too — see
+  below.
+
+## Shared settings
+
+`--user-data-dir` holds two different kinds of thing: per-instance state
+(`globalStorage`, `workspaceStorage`, `History`) that two processes can't share
+without fighting over SQLite locks, and the preference files you actually edit.
+Splitting the directory per project meant the second kind was split too, so
+every project drifted into its own theme, font size and icon theme.
+
+code-server has no flag to point the preference files somewhere else, so the
+app symlinks them instead: `settings.json`, `keybindings.json`, `snippets/` and
+`tasks.json` under each project's `User/` all point at one shared `user-config`
+directory in the app's data dir. The storage dirs stay private, so there's
+still no lock contention, but changing a setting in any project changes it
+everywhere — the projects are literally editing the same file, and VS Code
+reloads it live, so other *running* projects pick the change up without a
+restart.
+
+Symlinks rather than copies because VS Code notices the path is a link and
+writes settings in place, skipping the write-to-temp-then-rename it normally
+does (which would replace the link with a regular file and silently un-share
+it).
+
+On first run after this change, every project's existing `settings.json` is
+merged into the shared file — newest-modified wins a key two projects
+disagree on — rather than one being picked as the winner, so no setting that
+only ever existed in one project is lost. Each project's original is moved to
+`user-config-backup/<project id>/` first.
 
 ## The Terminal button
 

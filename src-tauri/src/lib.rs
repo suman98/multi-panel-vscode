@@ -1,5 +1,6 @@
 mod accounts;
 mod popup_bridge;
+mod shared_settings;
 mod vscode_bridge;
 
 use std::collections::HashMap;
@@ -143,6 +144,12 @@ fn start_project(
     let extensions_dir = data_dir.join("extensions");
     std::fs::create_dir_all(&user_data_dir).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&extensions_dir).map_err(|e| e.to_string())?;
+
+    // The storage dirs stay private, but the preference files inside
+    // user-data-dir are symlinked to one shared copy so every project runs
+    // with the same settings, keybindings and snippets. Like the extensions
+    // below, a server reads these once at startup — do it before spawning.
+    shared_settings::ensure_shared(&data_dir, &user_data_dir, &id);
 
     // A server reads its extensions once, at startup — write this before
     // spawning so the process we're about to start actually picks it up.

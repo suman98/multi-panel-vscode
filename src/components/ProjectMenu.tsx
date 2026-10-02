@@ -292,6 +292,37 @@ export function ProjectMenu({
   const [customOpen, setCustomOpen] = useState(!!custom);
   const [hexText, setHexText] = useState(custom ?? "");
   const swatchValue = normalizeHex(hexText) ?? custom ?? DEFAULT_CUSTOM;
+  const [pathCopied, setPathCopied] = useState(false);
+  const pathCopiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pathCopiedTimer.current) clearTimeout(pathCopiedTimer.current);
+  }, []);
+
+  const copyPath = async () => {
+    // navigator.clipboard needs a secure context — true here since the app
+    // serves its own UI over http://localhost (see README), but fall back to
+    // the old execCommand trick rather than silently doing nothing if some
+    // platform's webview doesn't expose it.
+    try {
+      await navigator.clipboard.writeText(project.path);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = project.path;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* nothing more to try */
+      }
+      document.body.removeChild(ta);
+    }
+    setPathCopied(true);
+    if (pathCopiedTimer.current) clearTimeout(pathCopiedTimer.current);
+    pathCopiedTimer.current = setTimeout(() => setPathCopied(false), 1200);
+  };
 
   const place = useCallback(() => {
     const el = ref.current;
@@ -362,6 +393,10 @@ export function ProjectMenu({
 
       <button className="pm-item" onClick={onOpenInVscode}>
        Open in new Editor
+      </button>
+
+      <button className="pm-item" onClick={copyPath} title={project.path}>
+        {pathCopied ? "Copied!" : "Copy Path"}
       </button>
 
       <button className="pm-item" onClick={onToggleFavorite}>

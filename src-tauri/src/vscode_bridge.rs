@@ -19,8 +19,8 @@ use tauri::AppHandle;
 static MANIFEST_LOCK: Mutex<()> = Mutex::new(());
 
 const HELPER_ID: &str = "multivscodepanel.vscode-bridge";
-const HELPER_VERSION: &str = "1.2.0";
-const HELPER_FOLDER: &str = "multivscodepanel.vscode-bridge-1.2.0";
+const HELPER_VERSION: &str = "1.3.0";
+const HELPER_FOLDER: &str = "multivscodepanel.vscode-bridge-1.3.0";
 const COMMAND_FILE: &str = "mvp-cmd.json";
 /// Persisted separately from the command file so a project started long after
 /// the last theme toggle still comes up matching, instead of always booting
@@ -32,7 +32,7 @@ const PACKAGE_JSON: &str = r#"{
   "displayName": "Multi VS Code Panel Bridge",
   "description": "Reveals the terminal, toggles the sidebar, and syncs the colour theme on command from the host app.",
   "publisher": "multivscodepanel",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "engines": { "vscode": "^1.90.0" },
   "main": "./extension.js",
   "activationEvents": ["onStartupFinished"],
@@ -115,20 +115,38 @@ const LIGHT_CUSTOMIZATIONS = {
   },
 };
 
-async function applySettings(map) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function pendingKeys(map) {
   const cfg = vscode.workspace.getConfiguration();
-  for (const key of Object.keys(map)) {
-    const want = map[key];
+  return Object.keys(map).filter((key) => {
     let current;
     try {
       current = cfg.inspect(key);
     } catch (_) {
-      current = undefined;
+      return true;
     }
     // Object values (colour customizations) never compare equal by identity.
-    if (current && JSON.stringify(current.globalValue) === JSON.stringify(want)) continue;
+    return !current || JSON.stringify(current.globalValue) !== JSON.stringify(map[key]);
+  });
+}
+
+async function applySettings(map) {
+  if (pendingKeys(map).length === 0) return;
+
+  // settings.json is one file shared by every project (the host app symlinks
+  // each user-data-dir's copy to it), and a setTheme broadcast reaches every
+  // running project at once — so writing immediately would have them all
+  // rewrite the same keys simultaneously and risk tearing the file. Waking at
+  // a random moment lets one instance write first; the rest re-read and find
+  // nothing left to do. One that still disagrees writes anyway, so a project
+  // whose file watcher missed the external edit still catches up.
+  await sleep(Math.floor(Math.random() * 900));
+
+  const cfg = vscode.workspace.getConfiguration();
+  for (const key of pendingKeys(map)) {
     try {
-      await cfg.update(key, want, vscode.ConfigurationTarget.Global);
+      await cfg.update(key, map[key], vscode.ConfigurationTarget.Global);
     } catch (_) {}
   }
 }
