@@ -255,6 +255,8 @@ interface Props {
   anchor: HTMLElement;
   onClose: () => void;
   onToggleFavorite: () => void;
+  /** empty string = go back to the folder name */
+  onRename: (name: string) => void;
   onColor: (color: string | null) => void;
   onUploadIcon: () => void;
   onClearIcon: () => void;
@@ -271,6 +273,7 @@ export function ProjectMenu({
   anchor,
   onClose,
   onToggleFavorite,
+  onRename,
   onColor,
   onUploadIcon,
   onClearIcon,
@@ -281,6 +284,8 @@ export function ProjectMenu({
   onManageAccounts,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [nameText, setNameText] = useState(project.name);
   const [pos, setPos] = useState<Placement>(OFFSCREEN);
   // null = pick whichever side fits; set once the user flips it by hand, and
   // then honoured even if that side is the tighter one — that's the point of
@@ -398,6 +403,37 @@ export function ProjectMenu({
       <button className="pm-item" onClick={copyPath} title={project.path}>
         {pathCopied ? "Copied!" : "Copy Path"}
       </button>
+
+      {renaming ? (
+        <div className="pm-rename-row">
+          <input
+            className="pm-rename"
+            value={nameText}
+            placeholder="Project name (empty = folder name)"
+            spellCheck={false}
+            autoComplete="off"
+            autoFocus
+            aria-label="Project display name"
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setNameText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onRename(nameText.trim());
+            }}
+          />
+          <button
+            className="pm-rename-ok"
+            onClick={() => onRename(nameText.trim())}
+            title="Save name"
+            aria-label="Save name"
+          >
+            ✓
+          </button>
+        </div>
+      ) : (
+        <button className="pm-item" onClick={() => setRenaming(true)}>
+          Rename…
+        </button>
+      )}
 
       <button className="pm-item" onClick={onToggleFavorite}>
         <span className={"pm-star" + (project.favorite ? " on" : "")}>

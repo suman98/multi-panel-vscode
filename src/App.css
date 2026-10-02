@@ -702,6 +702,47 @@ body.dnd-active .project-item:hover:not(.dragging) {
   border-color: var(--accent);
 }
 
+.pm-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 2px;
+}
+
+.pm-rename {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 12px;
+}
+
+.pm-rename:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pm-rename-ok {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.pm-rename-ok:hover {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}
+
 .pm-sep {
   height: 1px;
   margin: 7px 2px;

@@ -18,6 +18,7 @@ interface SidebarProps {
   /** how many projects currently have a VS Code instance up */
   openCount: number;
   onToggleFavorite: (id: string) => void;
+  onRename: (id: string, name: string) => void;
   onColor: (id: string, color: string | null) => void;
   onUploadIcon: (id: string) => void;
   onClearIcon: (id: string) => void;
@@ -141,6 +142,7 @@ export default function Sidebar({
   onCloseAll,
   openCount,
   onToggleFavorite,
+  onRename,
   onColor,
   onUploadIcon,
   onClearIcon,
@@ -532,6 +534,10 @@ export default function Sidebar({
           onToggleFavorite={() => {
             setMenu(null);
             onToggleFavorite(menuProject.id);
+          }}
+          onRename={(name) => {
+            setMenu(null);
+            onRename(menuProject.id, name);
           }}
           onColor={(c) => onColor(menuProject.id, c)}
           onUploadIcon={() => {

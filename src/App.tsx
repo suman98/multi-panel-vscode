@@ -332,6 +332,12 @@ function App() {
     });
   }
 
+  function renameProject(id: string, name: string) {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, name: name || nameFromPath(p.path) } : p)),
+    );
+  }
+
   function setColor(id: string, color: string | null) {
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, color } : p)));
   }
@@ -394,6 +400,7 @@ function App() {
             onCloseAll={closeAllProjects}
             openCount={openCount}
             onToggleFavorite={toggleFavorite}
+            onRename={renameProject}
             onColor={setColor}
             onUploadIcon={uploadIcon}
             onClearIcon={clearIcon}
