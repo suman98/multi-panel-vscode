@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { addAccount, adoptShellAccount, discoverShellAccounts, removeAccount } from "../api";
+import {
+  addAccount,
+  adoptShellAccount,
+  confirmDialog,
+  discoverShellAccounts,
+  removeAccount,
+} from "../api";
 import type { Account } from "../types";
 
 interface Props {
@@ -40,6 +46,14 @@ export function AccountsDialog({ accounts, onChange, onClose }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function remove(a: Account) {
+    const ok = await confirmDialog(
+      "Its token is deleted from the keychain. Projects using it switch to Default the next time they start.",
+      `Remove "${a.label}"?`,
+    );
+    if (ok) await run(() => removeAccount(a.id));
   }
 
   async function submit(e: React.FormEvent) {
@@ -83,7 +97,7 @@ export function AccountsDialog({ accounts, onChange, onClose }: Props) {
                   className="acct-remove"
                   disabled={busy}
                   title="Forget this account and its keychain token"
-                  onClick={() => run(() => removeAccount(a.id))}
+                  onClick={() => remove(a)}
                 >
                   Remove
                 </button>
