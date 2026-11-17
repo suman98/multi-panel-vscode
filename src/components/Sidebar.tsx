@@ -51,8 +51,23 @@ interface Group {
   items: Project[];
 }
 
-function buildGroups(projects: Project[], query: string): Group[] {
+const isOpen = (s: ProjectStatus | undefined) => s === "running" || s === "starting";
+
+function buildGroups(
+  projects: Project[],
+  query: string,
+  openOnly: boolean,
+  statuses: Record<string, ProjectStatus>,
+): Group[] {
   const q = query.trim().toLowerCase();
+  if (openOnly) {
+    const open = projects.filter(
+      (p) =>
+        isOpen(statuses[p.id]) &&
+        (!q || p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q)),
+    );
+    return open.length ? [{ key: "results", label: "Open", items: open }] : [];
+  }
   if (q) {
     const matches = projects.filter(
       (p) => p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q),
@@ -101,6 +116,27 @@ function CloseAllIcon() {
       <path d="M6.1 2.3h5.6a2 2 0 0 1 2 2v5.6" opacity="0.6" />
       <rect x="2.3" y="4.6" width="7.6" height="7.6" rx="1.7" />
       <path d="M4.7 7l2.8 2.8M7.5 7L4.7 9.8" />
+    </svg>
+  );
+}
+
+/** Stacked editor windows with a live dot — "show only the open ones". */
+function OpenOnlyIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="13"
+      height="13"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6.1 2.3h5.6a2 2 0 0 1 2 2v5.6" opacity="0.6" />
+      <rect x="2.3" y="4.6" width="7.6" height="7.6" rx="1.7" />
+      <circle cx="6.1" cy="8.4" r="1.5" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -154,9 +190,13 @@ export default function Sidebar({
 }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [menu, setMenu] = useState<{ id: string; anchor: HTMLElement } | null>(null);
-  const groups = useMemo(() => buildGroups(projects, query), [projects, query]);
+  const [openOnly, setOpenOnly] = useState(false);
+  const groups = useMemo(
+    () => buildGroups(projects, query, openOnly, statuses),
+    [projects, query, openOnly, statuses],
+  );
   const menuProject = menu ? projects.find((p) => p.id === menu.id) ?? null : null;
-  const canDrag = !query.trim();
+  const canDrag = !query.trim() && !openOnly;
 
   // ── pointer-based drag reorder (WKWebView has no usable HTML5 DnD) ──────────
   // The dragged row follows the pointer 1:1 while its neighbours slide out of
@@ -385,6 +425,16 @@ export default function Sidebar({
         <span className="sidebar-title">Projects</span>
         <div className="sidebar-actions">
           <button
+            className={"hdr-btn hdr-toggle" + (openOnly ? " active" : "")}
+            onClick={() => setOpenOnly((v) => !v)}
+            aria-pressed={openOnly}
+            title={openOnly ? "Show all projects" : `Show only open projects (${openCount})`}
+            aria-label="Show only open projects"
+          >
+            <OpenOnlyIcon />
+            {openCount > 0 && <span className="hdr-count">{openCount}</span>}
+          </button>
+          <button
             className="hdr-btn"
             onClick={onCloseAll}
             disabled={openCount === 0}
@@ -432,7 +482,11 @@ export default function Sidebar({
           <div className="empty-sidebar">No projects yet. Click + to add one.</div>
         )}
         {projects.length > 0 && groups.length === 0 && (
-          <div className="empty-sidebar">No matches for “{query}”.</div>
+          <div className="empty-sidebar">
+            {openOnly && !query.trim()
+              ? "No open projects."
+              : `No ${openOnly ? "open projects match" : "matches for"} “${query}”.`}
+          </div>
         )}
 
         {groups.map((group) => (
