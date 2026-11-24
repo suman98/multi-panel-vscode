@@ -466,6 +466,15 @@ export default function Sidebar({
           <input
             className="search"
             placeholder="Search projects…"
+            // WKWebView hangs macOS text services (autocorrect, inline
+            // predictions) off a focused input; while a suggestion is pending,
+            // the next click elsewhere is spent dismissing it, so picking a
+            // search result took two clicks. A search box wants none of them.
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            {...{ writingsuggestions: "false" }}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
